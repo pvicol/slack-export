@@ -362,7 +362,7 @@ def downloadFiles(token):
 
                             url = urlparse(value)
 
-                            localFile = os.path.join("../files.slack.com", url.path[1:])  # Need to discard first "/" in URL, because:
+                            localFile = os.path.join("files.slack.com", url.path[1:])  # Need to discard first "/" in URL, because:
                                 # "If a component is an absolute path, all previous components are thrown away and joining continues
                                 # from the absolute path component."
                             print("Downloading %s, saving to %s" % (url.geturl(), localFile))
@@ -381,7 +381,7 @@ def downloadFiles(token):
                             open(localFile, 'wb').write(r.content)
 
                             # Replace URL in data - suitable for use with slack-export-viewer if files.slack.com is linked
-                            slackFile[key] = "/static/files.slack.com%s" % url.path
+                            slackFile[key] = "../../static/files.slack.com%s" % url.path
 
             # Save updated data to json file
             with open(filePath, "w") as outFile:
