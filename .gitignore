@@ -86,9 +86,12 @@ celerybeat-schedule
 .venv
 env/
 venv/
+bin/
+include/
 ENV/
 env.bak/
 venv.bak/
+pyvenv.cfg
 
 # Spyder project settings
 .spyderproject
@@ -106,3 +109,7 @@ venv.bak/
 
 .vscode/
 .idea/
+.DS_Store
+
+# Slack Exports
+*-slack_export/

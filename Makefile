@@ -1,14 +1,9 @@
-# =================================================
-# Arquivo MAKEFILE para auxiliar o desenvolvedor.
-# =================================================
-
-
-# Monta o ambiente virtual
+.PHONY: build-env
 build-venv:
-	python3 -m venv venv
+	python3 -m venv .
 
-# Instala o ambiente
+.PHONY: install
 install:
-	@pip install --upgrade pip
-	@pip install setuptools wheel
-	@pip install -r requirements.txt
+	. bin/activate && pip install --upgrade pip
+	. bin/activate && pip install setuptools wheel
+	. bin/activate && pip install -r requirements.txt

@@ -5,7 +5,7 @@ import os
 import io
 import shutil
 import copy
-from datetime import datetime
+from datetime import datetime, timezone
 from pick import pick
 from time import sleep
 from urllib.parse import urlparse
@@ -100,7 +100,7 @@ def parseTimeStamp( timeStamp ):
         if len( t_list ) != 2:
             raise ValueError( 'Invalid time stamp' )
         else:
-            return datetime.utcfromtimestamp( float(t_list[0]) )
+            return datetime.fromtimestamp( float(t_list[0]), timezone.utc )
 
 
 # move channel files from old directory to one with new channel name
@@ -309,6 +309,12 @@ def selectConversations(allConversations, commandLineArg, filter, prompt):
     global args
     if args.excludeArchived:
         allConversations = [ conv for conv in allConversations if not conv["is_archived"] ]
+    if args.ignoreChannels:
+        convs = []
+        for conv in allConversations:
+            if not conv['is_im'] and conv["name"] not in args.ignoreChannels:
+                convs.append(conv)
+        allConversations = convs
     if isinstance(commandLineArg, list) and len(commandLineArg) > 0:
         return filter(allConversations, commandLineArg)
     elif commandLineArg != None or not anyConversationsSpecified():
@@ -333,31 +339,38 @@ def dumpDummyChannel():
     outFileName = u'{room}/{file}.json'.format( room = channelName, file = fileDate )
     writeMessageFile(outFileName, [])
 
-def downloadFiles(token):
+def downloadFiles(token, skip_thumbnails: bool = False):
     """
     Iterate through all json files, downloads files stored on files.slack.com and replaces the link with a local one
 
     Args:
         jsonDirectory: folder where the json files are in, will be searched recursively
     """
-    print("Starting to download files")
+    print("Starting to download files Function")
     for root, subdirs, files in os.walk("."):
         for filename in files:
             if not filename.endswith('.json'):
                 continue
+            print(f'Processing file: {filename}')
             filePath = os.path.join(root, filename)
             data = []
             with open(filePath) as inFile:
                 data = json.load(inFile)
                 for msg in data:
                     for slackFile in msg.get("files", []):
+                        print("Found file: %s" % slackFile.get("name"))
                         # Skip deleted files
                         if slackFile.get("mode") == "tombstone":
+                            print("Skipping deleted file: %s" % slackFile.get("name"))
                             continue
 
                         for key, value in slackFile.items():
                             # Find all entries referring to files on files.slack.com
-                            if not isinstance(value, str) or not value.startswith("https://files.slack.com/"):
+                            if not isinstance(value, str) or not value.startswith("https://files.slack.com/") or key == 'url_private_download':
+                                continue
+
+                            # Skip thumbnails
+                            if skip_thumbnails and key.lower().startswith('thumb'):
                                 continue
 
                             url = urlparse(value)
@@ -378,7 +391,9 @@ def downloadFiles(token):
                             # Download files
                             headers = {"Authorization": "Bearer %s" % token}
                             r = requests.get(url.geturl(), headers=headers)
-                            open(localFile, 'wb').write(r.content)
+                            r.raise_for_status()
+                            with open(localFile, 'wb') as f:
+                                f.write(r.content)
 
                             # Replace URL in data - suitable for use with slack-export-viewer if files.slack.com is linked
                             slackFile[key] = "../../static/files.slack.com%s" % url.path
@@ -416,6 +431,14 @@ if __name__ == "__main__":
         help="Export the given Public Channels")
 
     parser.add_argument(
+        '--ignoreChannels',
+        nargs='*',
+        default=None,
+        metavar='IGNORE_CHANNEL_NAME',
+        help='Ignore the given Public Channels'
+    )
+
+    parser.add_argument(
         '--groups',
         nargs='*',
         default=None,
@@ -441,6 +464,13 @@ if __name__ == "__main__":
         default=False,
         help="Downloads files from files.slack.com for local access, stored in 'files.slack.com' folder. "
             "Link this folder inside slack-export-viewer/slackviewer/static/ to have it work seamless with slack-export-viewer")
+
+    parser.add_argument(
+        '--skipThumbnails',
+        action='store_true',
+        default=False,
+        help="Skip downloading thumbnails"
+    )
 
     parser.add_argument(
         '--excludeArchived',
@@ -512,6 +542,7 @@ if __name__ == "__main__":
         fetchDirectMessages(selectedDms)
 
     if args.downloadSlackFiles:
-        downloadFiles(args.token)
+        print("Starting to download files")
+        downloadFiles(args.token, args.skipThumbnails)
 
     finalize()
